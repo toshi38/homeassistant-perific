@@ -1,11 +1,11 @@
 """Config flow for Perific Energy Meter integration."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResult
@@ -46,23 +46,23 @@ class PerificConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input["token"],
                 async_get_clientsession(self.hass),
             )
-            
+
             # Check if user is activated
             if not await api.check_activation():
                 errors["base"] = "invalid_auth"
                 return self.async_show_form(
                     step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
                 )
-            
+
             # Refresh token to validate it
             await api.refresh_token()
-            
+
             # Get user info to validate the connection
             user_info = await api.get_user_info()
-            
+
             # Close the session
             await api.close()
-            
+
         except PerificAuthError:
             errors["base"] = "invalid_auth"
         except Exception:  # pylint: disable=broad-except
@@ -72,7 +72,7 @@ class PerificConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Check if already configured
             await self.async_set_unique_id(user_info.get("Email"))
             self._abort_if_unique_id_configured()
-            
+
             return self.async_create_entry(
                 title=f"Perific ({user_info.get('Email')})",
                 data=user_input,

@@ -1,4 +1,5 @@
 """Constants for the Perific integration."""
+
 from datetime import timedelta
 
 DOMAIN = "perific"
@@ -45,4 +46,3 @@ ATTR_EXPORTED = "exported"
 ATTR_FIRMWARE = "firmware"
 ATTR_SIGNAL_STRENGTH = "signal_strength"
 ATTR_TIMESTAMP = "timestamp"
-
