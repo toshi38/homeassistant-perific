@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Perific Energy Meter",
+        "description": "Enter your Perific account email and authentication token",
+        "data": {
+          "email": "Email",
+          "token": "Authentication Token"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}
