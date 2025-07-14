@@ -1,0 +1,173 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  merge_group:
+
+jobs:
+  lint-and-format:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort
+    
+    - name: Run black (code formatting)
+      run: black --check --diff .
+    
+    - name: Run isort (import sorting)
+      run: isort --check-only --diff .
+    
+    - name: Run flake8 (linting)
+      run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run standalone API tests (mocked)
+      run: python test_api_standalone_mock.py
+      env:
+        CI: true
+        PERIFIC_EMAIL: ${{ secrets.PERIFIC_EMAIL }}
+        PERIFIC_TOKEN: ${{ secrets.PERIFIC_TOKEN }}
+
+  integration-check:
+    name: Integration Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Validate integration structure
+      run: |
+        # Check required files exist
+        test -f custom_components/perific/__init__.py
+        test -f custom_components/perific/manifest.json
+        test -f custom_components/perific/config_flow.py
+        test -f custom_components/perific/sensor.py
+        test -f custom_components/perific/strings.json
+        echo "✓ All required integration files present"
+    
+    - name: Test integration structure and manifest
+      run: |
+        python -c "
+        import os
+        import json
+        
+        # Check file structure
+        print('Checking integration file structure...')
+        required_files = [
+            'custom_components/perific/__init__.py',
+            'custom_components/perific/manifest.json',
+            'custom_components/perific/config_flow.py',
+            'custom_components/perific/sensor.py',
+            'custom_components/perific/api.py',
+            'custom_components/perific/const.py',
+            'custom_components/perific/strings.json',
+        ]
+        
+        for file_path in required_files:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f'Required file missing: {file_path}')
+        print('✓ All required integration files present')
+        
+        # Test manifest validation
+        print('Validating manifest.json...')
+        with open('custom_components/perific/manifest.json') as f:
+            manifest = json.load(f)
+        
+        required_fields = ['domain', 'name', 'version', 'codeowners', 'integration_type']
+        missing_fields = [field for field in required_fields if field not in manifest]
+        
+        if missing_fields:
+            raise ValueError(f'Missing required fields: {missing_fields}')
+        
+        valid_types = ['device', 'hub', 'service', 'system']
+        if manifest.get('integration_type') not in valid_types:
+            raise ValueError(f'Invalid integration_type. Must be one of: {valid_types}')
+        
+        print('✓ Manifest validation passed')
+        print(f'✓ Integration: {manifest[\"name\"]} v{manifest[\"version\"]}')
+        print(f'✓ Type: {manifest[\"integration_type\"]}')
+        print('✅ All integration checks passed')
+        "
+
+  manifest-validation:
+    name: Manifest Validation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Validate manifest.json
+      run: |
+        python -c "
+        import json
+        import sys
+        
+        # Load and validate manifest
+        with open('custom_components/perific/manifest.json') as f:
+            manifest = json.load(f)
+        
+        # Check required fields
+        required_fields = ['domain', 'name', 'version', 'codeowners', 'integration_type']
+        missing_fields = [field for field in required_fields if field not in manifest]
+        
+        if missing_fields:
+            print(f'❌ Missing required fields: {missing_fields}')
+            sys.exit(1)
+        
+        # Check version format
+        version = manifest.get('version')
+        if not version or not isinstance(version, str):
+            print('❌ Invalid version format')
+            sys.exit(1)
+        
+        # Check integration_type
+        valid_types = ['device', 'hub', 'service', 'system']
+        if manifest.get('integration_type') not in valid_types:
+            print(f'❌ Invalid integration_type. Must be one of: {valid_types}')
+            sys.exit(1)
+        
+        print('✓ Manifest validation passed')
+        print(f'✓ Integration: {manifest[\"name\"]} v{manifest[\"version\"]}')
+        print(f'✓ Type: {manifest[\"integration_type\"]}')
+        "

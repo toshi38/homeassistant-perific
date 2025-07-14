@@ -1,4 +1,5 @@
 """The Perific Energy Meter integration."""
+
 from __future__ import annotations
 
 import logging
@@ -24,14 +25,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = PerificAPI(
         entry.data["email"],
         entry.data.get("token"),
-        session=aiohttp_client.async_get_clientsession(hass)
+        session=aiohttp_client.async_get_clientsession(hass),
     )
 
     try:
         # Check if user is activated and refresh token if needed
         if not await api.check_activation():
             raise ConfigEntryNotReady("User account is not activated")
-        
+
         if api._token:
             await api.refresh_token()
     except Exception as err:
@@ -76,14 +77,14 @@ class PerificDataUpdateCoordinator(DataUpdateCoordinator):
         """Fetch data from API."""
         try:
             data = {}
-            
+
             # Get user info
             user_info = await self.api.get_user_info()
             data["user"] = user_info
-            
+
             # Discover items/meters
             items = await self.api.discover_items()
-            
+
             # Get power and energy data for each item
             data["items"] = {}
             for item in items:
@@ -93,9 +94,9 @@ class PerificDataUpdateCoordinator(DataUpdateCoordinator):
                     "power": await self.api.get_current_power(item_id),
                     "energy_today": await self.api.get_energy_today(item_id),
                 }
-                
+
                 data["items"][item_id] = item_data
-            
+
             return data
         except Exception as err:
             raise UpdateFailed(f"Error fetching data: {err}") from err

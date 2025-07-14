@@ -1,4 +1,5 @@
 """Support for Perific energy meter sensors."""
+
 from __future__ import annotations
 
 import logging
@@ -11,34 +12,22 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    UnitOfEnergy,
-    UnitOfPower,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
-    UnitOfFrequency,
+    UnitOfEnergy,
+    UnitOfPower,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DOMAIN,
+    ATTR_FIRMWARE,
     ATTR_ITEM_ID,
     ATTR_ITEM_NAME,
-    ATTR_PHASE_L1,
-    ATTR_PHASE_L2,
-    ATTR_PHASE_L3,
-    ATTR_TOTAL,
-    ATTR_IMPORTED,
-    ATTR_EXPORTED,
-    ATTR_FIRMWARE,
     ATTR_SIGNAL_STRENGTH,
     ATTR_TIMESTAMP,
-    UNIT_POWER,
-    UNIT_ENERGY,
-    UNIT_VOLTAGE,
-    UNIT_CURRENT,
-    UNIT_FREQUENCY,
+    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,43 +40,51 @@ async def async_setup_entry(
 ) -> None:
     """Set up Perific sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-    
+
     entities = []
-    
+
     # Create sensors for each item
     for item_id, item_data in coordinator.data.get("items", {}).items():
         item_info = item_data["info"]
         item_name = item_info.get("name", f"Item {item_id}")
-        
+
         # Power sensors
-        entities.extend([
-            PerificPowerSensor(coordinator, item_id, item_name, "total"),
-            PerificPowerSensor(coordinator, item_id, item_name, "l1"),
-            PerificPowerSensor(coordinator, item_id, item_name, "l2"),
-            PerificPowerSensor(coordinator, item_id, item_name, "l3"),
-        ])
-        
+        entities.extend(
+            [
+                PerificPowerSensor(coordinator, item_id, item_name, "total"),
+                PerificPowerSensor(coordinator, item_id, item_name, "l1"),
+                PerificPowerSensor(coordinator, item_id, item_name, "l2"),
+                PerificPowerSensor(coordinator, item_id, item_name, "l3"),
+            ]
+        )
+
         # Voltage sensors
-        entities.extend([
-            PerificVoltageSensor(coordinator, item_id, item_name, "l1"),
-            PerificVoltageSensor(coordinator, item_id, item_name, "l2"),
-            PerificVoltageSensor(coordinator, item_id, item_name, "l3"),
-        ])
-        
+        entities.extend(
+            [
+                PerificVoltageSensor(coordinator, item_id, item_name, "l1"),
+                PerificVoltageSensor(coordinator, item_id, item_name, "l2"),
+                PerificVoltageSensor(coordinator, item_id, item_name, "l3"),
+            ]
+        )
+
         # Current sensors
-        entities.extend([
-            PerificCurrentSensor(coordinator, item_id, item_name, "l1"),
-            PerificCurrentSensor(coordinator, item_id, item_name, "l2"),
-            PerificCurrentSensor(coordinator, item_id, item_name, "l3"),
-        ])
-        
+        entities.extend(
+            [
+                PerificCurrentSensor(coordinator, item_id, item_name, "l1"),
+                PerificCurrentSensor(coordinator, item_id, item_name, "l2"),
+                PerificCurrentSensor(coordinator, item_id, item_name, "l3"),
+            ]
+        )
+
         # Energy sensors
-        entities.extend([
-            PerificEnergySensor(coordinator, item_id, item_name, "imported"),
-            PerificEnergySensor(coordinator, item_id, item_name, "exported"),
-            PerificEnergySensor(coordinator, item_id, item_name, "net"),
-        ])
-    
+        entities.extend(
+            [
+                PerificEnergySensor(coordinator, item_id, item_name, "imported"),
+                PerificEnergySensor(coordinator, item_id, item_name, "exported"),
+                PerificEnergySensor(coordinator, item_id, item_name, "net"),
+            ]
+        )
+
     async_add_entities(entities)
 
 
@@ -108,7 +105,7 @@ class PerificSensorEntity(CoordinatorEntity, SensorEntity):
         self._item_name = item_name
         self._sensor_type = sensor_type
         self._phase = phase
-        
+
         # Build unique_id and entity_id
         if phase:
             self._attr_unique_id = f"{item_id}_{sensor_type}_{phase}"
@@ -122,7 +119,7 @@ class PerificSensorEntity(CoordinatorEntity, SensorEntity):
         """Return device information."""
         item_data = self.coordinator.data.get("items", {}).get(self._item_id, {})
         item_info = item_data.get("info", {})
-        
+
         return {
             "identifiers": {(DOMAIN, self._item_id)},
             "name": self._item_name,
@@ -137,19 +134,19 @@ class PerificSensorEntity(CoordinatorEntity, SensorEntity):
         """Return additional state attributes."""
         item_data = self.coordinator.data.get("items", {}).get(self._item_id, {})
         power_data = item_data.get("power", {})
-        
+
         attrs = {
             ATTR_ITEM_ID: self._item_id,
             ATTR_ITEM_NAME: self._item_name,
         }
-        
+
         if power_data.get("timestamp"):
             attrs[ATTR_TIMESTAMP] = power_data["timestamp"]
         if power_data.get("firmware"):
             attrs[ATTR_FIRMWARE] = power_data["firmware"]
         if power_data.get("signal_strength"):
             attrs[ATTR_SIGNAL_STRENGTH] = power_data["signal_strength"]
-        
+
         return attrs
 
 
@@ -168,7 +165,7 @@ class PerificPowerSensor(PerificSensorEntity):
         """Handle updated data from the coordinator."""
         item_data = self.coordinator.data.get("items", {}).get(self._item_id, {})
         power_data = item_data.get("power", {})
-        
+
         if power_data:
             power = power_data.get("power", {})
             if self._phase == "total":
@@ -177,7 +174,7 @@ class PerificPowerSensor(PerificSensorEntity):
                 self._attr_native_value = power.get(self._phase)
         else:
             self._attr_native_value = None
-        
+
         super()._handle_coordinator_update()
 
 
@@ -196,13 +193,13 @@ class PerificVoltageSensor(PerificSensorEntity):
         """Handle updated data from the coordinator."""
         item_data = self.coordinator.data.get("items", {}).get(self._item_id, {})
         power_data = item_data.get("power", {})
-        
+
         if power_data:
             voltage = power_data.get("voltage", {})
             self._attr_native_value = voltage.get(self._phase)
         else:
             self._attr_native_value = None
-        
+
         super()._handle_coordinator_update()
 
 
@@ -221,20 +218,24 @@ class PerificCurrentSensor(PerificSensorEntity):
         """Handle updated data from the coordinator."""
         item_data = self.coordinator.data.get("items", {}).get(self._item_id, {})
         power_data = item_data.get("power", {})
-        
+
         if power_data:
             current = power_data.get("current", {})
-            self._attr_native_value = abs(current.get(self._phase, 0))  # Use absolute value
+            self._attr_native_value = abs(
+                current.get(self._phase, 0)
+            )  # Use absolute value
         else:
             self._attr_native_value = None
-        
+
         super()._handle_coordinator_update()
 
 
 class PerificEnergySensor(PerificSensorEntity):
     """Representation of a Perific energy sensor."""
 
-    def __init__(self, coordinator, item_id: int, item_name: str, energy_type: str) -> None:
+    def __init__(
+        self, coordinator, item_id: int, item_name: str, energy_type: str
+    ) -> None:
         """Initialize the energy sensor."""
         super().__init__(coordinator, item_id, item_name, f"energy_{energy_type}")
         self._energy_type = energy_type
@@ -246,7 +247,7 @@ class PerificEnergySensor(PerificSensorEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         item_data = self.coordinator.data.get("items", {}).get(self._item_id, {})
-        
+
         if self._energy_type in ["imported", "exported", "net"]:
             energy_data = item_data.get("energy_today", {})
             self._attr_native_value = energy_data.get(self._energy_type, 0)
@@ -259,7 +260,5 @@ class PerificEnergySensor(PerificSensorEntity):
                 self._attr_native_value = power_data.get("exported_energy", 0)
             else:
                 self._attr_native_value = None
-        
+
         super()._handle_coordinator_update()
-
-
