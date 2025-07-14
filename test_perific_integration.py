@@ -76,15 +76,8 @@ async def test_api():
             else:
                 print("  No energy data available")
                 
-        print("\nGetting spot prices...")
-        spot_prices = await api.get_spot_prices()
-        if spot_prices:
-            latest_price = spot_prices[0]
-            print(f"Country: {latest_price.get('Country')}")
-            print(f"Area: {latest_price.get('Area')}")
-            print(f"Currency: {latest_price.get('Currency')}")
-            prices_json = json.loads(latest_price.get('JsonPrices', '{}'))
-            print(f"Average price: {prices_json.get('average', 0):.2f}")
+        # Note: Spot prices functionality not implemented in this version
+        print("\nSpot prices functionality not implemented in this version")
             
     except Exception as e:
         print(f"Error: {e}")

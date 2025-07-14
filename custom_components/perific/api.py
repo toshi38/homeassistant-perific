@@ -4,10 +4,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import ssl
 from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp
+import certifi
 from aiohttp import ClientError, ClientSession
 
 from .const import (
@@ -45,7 +47,15 @@ class PerificAPI:
         """Initialize the API client."""
         self._username = username
         self._token = token
-        self._session = session or ClientSession()
+        
+        # Create SSL context with proper certificates
+        if session is None:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            self._session = ClientSession(connector=connector)
+        else:
+            self._session = session
+            
         self._token_expires: datetime | None = None
         self._user_id: int | None = None
         self._items: list[dict[str, Any]] = []
