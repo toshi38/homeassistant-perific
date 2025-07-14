@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import PerificAPI
@@ -23,7 +24,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = PerificAPI(
         entry.data["email"],
         entry.data.get("token"),
-        session=hass.helpers.aiohttp_client.async_get_clientsession()
+        session=aiohttp_client.async_get_clientsession(hass)
     )
 
     try:

@@ -53,8 +53,10 @@ class PerificAPI:
             ssl_context = ssl.create_default_context(cafile=certifi.where())
             connector = aiohttp.TCPConnector(ssl=ssl_context)
             self._session = ClientSession(connector=connector)
+            self._session_owner = True  # We created the session
         else:
             self._session = session
+            self._session_owner = False  # Session provided by Home Assistant
             
         self._token_expires: datetime | None = None
         self._user_id: int | None = None
@@ -307,4 +309,6 @@ class PerificAPI:
 
     async def close(self) -> None:
         """Close the session."""
-        await self._session.close()
+        # Only close the session if we created it
+        if self._session_owner:
+            await self._session.close()
