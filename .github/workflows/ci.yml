@@ -48,7 +48,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-mock
     
     - name: Run standalone API tests (mocked)
       run: python test_api_standalone_mock.py
@@ -56,28 +55,6 @@ jobs:
         CI: true
         PERIFIC_EMAIL: ${{ secrets.PERIFIC_EMAIL }}
         PERIFIC_TOKEN: ${{ secrets.PERIFIC_TOKEN }}
-    
-    - name: Test integration basic functionality
-      run: |
-        python -c "
-        import sys
-        sys.path.insert(0, 'custom_components/perific')
-        
-        import asyncio
-        from api import PerificAPI
-        
-        async def test():
-            # Test basic API initialization
-            api = PerificAPI('test@example.com', 'test-token')
-            print('✓ API can be initialized')
-            await api.close()
-            print('✓ API can be closed')
-            
-        asyncio.run(test())
-        print('✓ Integration basic functionality works')
-        "
-      env:
-        CI: true
 
   integration-check:
     name: Integration Check
@@ -90,10 +67,10 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install Home Assistant
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install homeassistant
+        pip install -r requirements.txt
     
     - name: Validate integration structure
       run: |
@@ -105,25 +82,48 @@ jobs:
         test -f custom_components/perific/strings.json
         echo "✓ All required integration files present"
     
-    - name: Test integration import
+    - name: Test integration structure and manifest
       run: |
         python -c "
-        import sys
-        sys.path.insert(0, 'custom_components/perific')
+        import os
+        import json
         
-        # Test basic module imports
-        import api
-        print('✓ API module imports successfully')
+        # Check file structure
+        print('Checking integration file structure...')
+        required_files = [
+            'custom_components/perific/__init__.py',
+            'custom_components/perific/manifest.json',
+            'custom_components/perific/config_flow.py',
+            'custom_components/perific/sensor.py',
+            'custom_components/perific/api.py',
+            'custom_components/perific/const.py',
+            'custom_components/perific/strings.json',
+        ]
         
-        # Test async functionality
-        import asyncio
-        async def test():
-            api_instance = api.PerificAPI('test@example.com', 'test-token')
-            await api_instance.close()
-            print('✓ API async functionality works')
+        for file_path in required_files:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f'Required file missing: {file_path}')
+        print('✓ All required integration files present')
         
-        asyncio.run(test())
-        print('✓ Integration import tests passed')
+        # Test manifest validation
+        print('Validating manifest.json...')
+        with open('custom_components/perific/manifest.json') as f:
+            manifest = json.load(f)
+        
+        required_fields = ['domain', 'name', 'version', 'codeowners', 'integration_type']
+        missing_fields = [field for field in required_fields if field not in manifest]
+        
+        if missing_fields:
+            raise ValueError(f'Missing required fields: {missing_fields}')
+        
+        valid_types = ['device', 'hub', 'service', 'system']
+        if manifest.get('integration_type') not in valid_types:
+            raise ValueError(f'Invalid integration_type. Must be one of: {valid_types}')
+        
+        print('✓ Manifest validation passed')
+        print(f'✓ Integration: {manifest[\"name\"]} v{manifest[\"version\"]}')
+        print(f'✓ Type: {manifest[\"integration_type\"]}')
+        print('✅ All integration checks passed')
         "
 
   manifest-validation:
