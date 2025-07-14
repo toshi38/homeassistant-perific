@@ -2,3 +2,4 @@
 aiohttp>=3.8.0
 python-dotenv>=0.19.0
 certifi>=2021.5.30
+homeassistant>=2024.1.0
