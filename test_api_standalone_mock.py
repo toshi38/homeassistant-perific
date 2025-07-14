@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -91,7 +92,7 @@ async def run_tests(api):
             # Show real-time data
             if "PhaseRealTime" in packet:
                 phase_data = packet["PhaseRealTime"]
-                print(f"   📡 PhaseRealTime:")
+                print("   📡 PhaseRealTime:")
                 print(f"      🔌 Current (A): {phase_data.get('hiavg', [])}")
                 print(f"      ⚡ Voltage (V): {phase_data.get('huavg', [])}")
 

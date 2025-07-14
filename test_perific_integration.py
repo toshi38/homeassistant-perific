@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Test script for Perific API integration (Corrected)."""
 import asyncio
-import json
 import os
 
 from custom_components.perific.api import PerificAPI
@@ -60,15 +59,12 @@ async def test_api():
             print("Getting current power...")
             power_data = await api.get_current_power(item_id)
             if power_data:
-                print(
-                    f"  Total power: {power_data.get('power', {}).get('total', 0):.1f} W"
-                )
-                print(
-                    f"  Voltage L1: {power_data.get('voltage', {}).get('l1', 0):.1f} V"
-                )
-                print(
-                    f"  Current L1: {power_data.get('current', {}).get('l1', 0):.2f} A"
-                )
+                total_power = power_data.get("power", {}).get("total", 0)
+                voltage_l1 = power_data.get("voltage", {}).get("l1", 0)
+                current_l1 = power_data.get("current", {}).get("l1", 0)
+                print(f"  Total power: {total_power:.1f} W")
+                print(f"  Voltage L1: {voltage_l1:.1f} V")
+                print(f"  Current L1: {current_l1:.2f} A")
                 print(f"  Firmware: {power_data.get('firmware')}")
                 print(f"  Signal: {power_data.get('signal_strength')} dBm")
             else:

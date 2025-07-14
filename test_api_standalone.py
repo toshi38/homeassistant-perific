@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Standalone test script for Perific API."""
 import asyncio
-import json
 import os
-from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -18,7 +16,7 @@ except ImportError:
     print("   You can also set environment variables manually.")
 
 # Import mock data
-from mock_data import MOCK_LATEST_PACKETS, get_mock_response
+from mock_data import get_mock_response
 
 
 class PerificAPI:
@@ -147,7 +145,7 @@ async def run_tests(api):
             # Show real-time data
             if "PhaseRealTime" in packet:
                 phase_data = packet["PhaseRealTime"]
-                print(f"   📡 PhaseRealTime:")
+                print("   📡 PhaseRealTime:")
                 print(f"      🔌 Current (A): {phase_data.get('hiavg', [])}")
                 print(f"      ⚡ Voltage (V): {phase_data.get('huavg', [])}")
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import ssl
 from datetime import datetime, timedelta
@@ -13,9 +11,17 @@ import aiohttp
 import certifi
 from aiohttp import ClientError, ClientSession
 
-from .const import (API_ACCOUNT_OVERVIEW, API_BASE_URL, API_IS_ACTIVATED,
-                    API_ITEM_PARAMETERS, API_LATEST_PACKETS, API_PHASE_DATA,
-                    API_REFRESH_TOKEN, API_REPORTER_SETTINGS, API_USER_INFO)
+from .const import (
+    API_ACCOUNT_OVERVIEW,
+    API_BASE_URL,
+    API_IS_ACTIVATED,
+    API_ITEM_PARAMETERS,
+    API_LATEST_PACKETS,
+    API_PHASE_DATA,
+    API_REFRESH_TOKEN,
+    API_REPORTER_SETTINGS,
+    API_USER_INFO,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

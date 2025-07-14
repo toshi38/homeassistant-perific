@@ -5,21 +5,30 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import (SensorDeviceClass, SensorEntity,
-                                             SensorStateClass)
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (UnitOfElectricCurrent,
-                                 UnitOfElectricPotential, UnitOfEnergy,
-                                 UnitOfFrequency, UnitOfPower)
+from homeassistant.const import (
+    UnitOfElectricCurrent,
+    UnitOfElectricPotential,
+    UnitOfEnergy,
+    UnitOfPower,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (ATTR_EXPORTED, ATTR_FIRMWARE, ATTR_IMPORTED, ATTR_ITEM_ID,
-                    ATTR_ITEM_NAME, ATTR_PHASE_L1, ATTR_PHASE_L2,
-                    ATTR_PHASE_L3, ATTR_SIGNAL_STRENGTH, ATTR_TIMESTAMP,
-                    ATTR_TOTAL, DOMAIN, UNIT_CURRENT, UNIT_ENERGY,
-                    UNIT_FREQUENCY, UNIT_POWER, UNIT_VOLTAGE)
+from .const import (
+    ATTR_FIRMWARE,
+    ATTR_ITEM_ID,
+    ATTR_ITEM_NAME,
+    ATTR_SIGNAL_STRENGTH,
+    ATTR_TIMESTAMP,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
