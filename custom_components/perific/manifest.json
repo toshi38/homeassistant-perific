@@ -1,13 +1,18 @@
 {
   "domain": "perific",
   "name": "Perific Energy Meter",
-  "codeowners": ["@toshi38"],
+  "codeowners": [
+    "@toshi38"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/toshi38/homeassistant-perific",
   "issue_tracker": "https://github.com/toshi38/homeassistant-perific/issues",
   "integration_type": "device",
   "iot_class": "cloud_polling",
-  "requirements": ["aiohttp>=3.8.0", "certifi>=2021.5.30"],
-  "version": "1.0.0"
+  "requirements": [
+    "aiohttp>=3.8.0",
+    "certifi>=2021.5.30"
+  ],
+  "version": "1.1.0"
 }
