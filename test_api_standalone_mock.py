@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Standalone test script for Perific API with mock support."""
+
 import asyncio
 import os
 from unittest.mock import AsyncMock, patch
