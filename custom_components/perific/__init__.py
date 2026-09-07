@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_EMAIL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import PerificAPI
+from .api import PerificAPI, PerificAuthError
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,20 +24,21 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Perific from a config entry."""
     api = PerificAPI(
-        entry.data["email"],
+        entry.data[CONF_EMAIL],
         entry.data.get("token"),
         session=aiohttp_client.async_get_clientsession(hass),
     )
 
     try:
-        # Check if user is activated and refresh token if needed
         if not await api.check_activation():
             raise ConfigEntryNotReady("User account is not activated")
 
-        if api._token:
+        if entry.data.get("token"):
             await api.refresh_token()
-    except Exception as err:
+    except PerificAuthError as err:
         raise ConfigEntryNotReady(f"Failed to authenticate: {err}") from err
+    except Exception as err:
+        raise ConfigEntryNotReady(f"Failed to initialize integration: {err}") from err
 
     coordinator = PerificDataUpdateCoordinator(hass, api)
     await coordinator.async_config_entry_first_refresh()
@@ -48,19 +50,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
-
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 
 
-class PerificDataUpdateCoordinator(DataUpdateCoordinator):
+class PerificDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Class to manage fetching Perific data."""
 
     def __init__(self, hass: HomeAssistant, api: PerificAPI) -> None:
@@ -73,29 +74,24 @@ class PerificDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=30),
         )
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from API."""
         try:
-            data = {}
+            data: dict[str, Any] = {}
 
-            # Get user info
             user_info = await self.api.get_user_info()
             data["user"] = user_info
 
-            # Discover items/meters
             items = await self.api.discover_items()
-
-            # Get power and energy data for each item
             data["items"] = {}
+
             for item in items:
                 item_id = item["id"]
-                item_data = {
+                data["items"][item_id] = {
                     "info": item,
                     "power": await self.api.get_current_power(item_id),
                     "energy_today": await self.api.get_energy_today(item_id),
                 }
-
-                data["items"][item_id] = item_data
 
             return data
         except Exception as err:

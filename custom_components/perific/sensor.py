@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -30,8 +29,6 @@ from .const import (
     DOMAIN,
 )
 
-_LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -40,50 +37,39 @@ async def async_setup_entry(
 ) -> None:
     """Set up Perific sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    entities: list[SensorEntity] = []
 
-    entities = []
-
-    # Create sensors for each item
     for item_id, item_data in coordinator.data.get("items", {}).items():
         item_info = item_data["info"]
         item_name = item_info.get("name", f"Item {item_id}")
 
-        # Power sensors
         entities.extend(
             [
                 PerificPowerSensor(coordinator, item_id, item_name, "total"),
                 PerificPowerSensor(coordinator, item_id, item_name, "l1"),
                 PerificPowerSensor(coordinator, item_id, item_name, "l2"),
                 PerificPowerSensor(coordinator, item_id, item_name, "l3"),
-            ]
-        )
-
-        # Voltage sensors
-        entities.extend(
-            [
                 PerificVoltageSensor(coordinator, item_id, item_name, "l1"),
                 PerificVoltageSensor(coordinator, item_id, item_name, "l2"),
                 PerificVoltageSensor(coordinator, item_id, item_name, "l3"),
-            ]
-        )
-
-        # Current sensors
-        entities.extend(
-            [
                 PerificCurrentSensor(coordinator, item_id, item_name, "l1"),
                 PerificCurrentSensor(coordinator, item_id, item_name, "l2"),
                 PerificCurrentSensor(coordinator, item_id, item_name, "l3"),
             ]
         )
 
-        # Energy sensors
-        entities.extend(
-            [
-                PerificEnergySensor(coordinator, item_id, item_name, "imported"),
-                PerificEnergySensor(coordinator, item_id, item_name, "exported"),
-                PerificEnergySensor(coordinator, item_id, item_name, "net"),
-            ]
-        )
+        energy_today = item_data.get("energy_today", {})
+        if any(
+            energy_today.get(key) is not None
+            for key in ("imported", "exported", "net")
+        ):
+            entities.extend(
+                [
+                    PerificEnergySensor(coordinator, item_id, item_name, "imported"),
+                    PerificEnergySensor(coordinator, item_id, item_name, "exported"),
+                    PerificEnergySensor(coordinator, item_id, item_name, "net"),
+                ]
+            )
 
     async_add_entities(entities)
 
@@ -106,7 +92,6 @@ class PerificSensorEntity(CoordinatorEntity, SensorEntity):
         self._sensor_type = sensor_type
         self._phase = phase
 
-        # Build unique_id and entity_id
         if phase:
             self._attr_unique_id = f"{item_id}_{sensor_type}_{phase}"
             self._attr_name = f"{item_name} {sensor_type.title()} {phase.upper()}"
@@ -140,12 +125,16 @@ class PerificSensorEntity(CoordinatorEntity, SensorEntity):
             ATTR_ITEM_NAME: self._item_name,
         }
 
-        if power_data.get("timestamp"):
+        if power_data.get("timestamp") is not None:
             attrs[ATTR_TIMESTAMP] = power_data["timestamp"]
-        if power_data.get("firmware"):
+        if power_data.get("firmware") is not None:
             attrs[ATTR_FIRMWARE] = power_data["firmware"]
-        if power_data.get("signal_strength"):
+        if power_data.get("signal_strength") is not None:
             attrs[ATTR_SIGNAL_STRENGTH] = power_data["signal_strength"]
+
+        packet_type = power_data.get("packet_type")
+        if packet_type is not None:
+            attrs["packet_type"] = packet_type
 
         return attrs
 
@@ -168,10 +157,7 @@ class PerificPowerSensor(PerificSensorEntity):
 
         if power_data:
             power = power_data.get("power", {})
-            if self._phase == "total":
-                self._attr_native_value = power.get("total")
-            else:
-                self._attr_native_value = power.get(self._phase)
+            self._attr_native_value = power.get("total") if self._phase == "total" else power.get(self._phase)
         else:
             self._attr_native_value = None
 
@@ -221,9 +207,8 @@ class PerificCurrentSensor(PerificSensorEntity):
 
         if power_data:
             current = power_data.get("current", {})
-            self._attr_native_value = abs(
-                current.get(self._phase, 0)
-            )  # Use absolute value
+            value = current.get(self._phase)
+            self._attr_native_value = abs(value) if value is not None else None
         else:
             self._attr_native_value = None
 
@@ -250,14 +235,13 @@ class PerificEnergySensor(PerificSensorEntity):
 
         if self._energy_type in ["imported", "exported", "net"]:
             energy_data = item_data.get("energy_today", {})
-            self._attr_native_value = energy_data.get(self._energy_type, 0)
+            self._attr_native_value = energy_data.get(self._energy_type)
         else:
-            # For total energy, use the imported/exported from power data
             power_data = item_data.get("power", {})
             if self._energy_type == "imported_total":
-                self._attr_native_value = power_data.get("imported_energy", 0)
+                self._attr_native_value = power_data.get("imported_energy")
             elif self._energy_type == "exported_total":
-                self._attr_native_value = power_data.get("exported_energy", 0)
+                self._attr_native_value = power_data.get("exported_energy")
             else:
                 self._attr_native_value = None
 
