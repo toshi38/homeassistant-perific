@@ -21,6 +21,8 @@ from .const import (
     API_REFRESH_TOKEN,
     API_REPORTER_SETTINGS,
     API_USER_INFO,
+    MAS_PER_AMPERE_HOUR,
+    NOMINAL_VOLTAGE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -198,6 +200,44 @@ class PerificAPI:
         """Get reporter settings (EV chargers, etc.)."""
         return await self._request("POST", API_REPORTER_SETTINGS)
 
+    @staticmethod
+    def _phase_readings(data: dict[str, Any]) -> tuple[list[float], list[float], bool]:
+        """Return (current, voltage, voltage_is_assumed) for one phase packet.
+
+        Packet version 3 reports "hiavg" and "huavg", current and measured
+        voltage. Packet version 2 clamp sensors report "iavg" only and carry no
+        voltage register, so nominal voltage has to be assumed for those.
+        """
+        if data.get("hiavg"):
+            current = list(data["hiavg"])[:3]
+            voltage = list(data.get("huavg") or [])[:3]
+            assumed = not data.get("huavg")
+        else:
+            current = list(data.get("iavg") or [])[:3]
+            voltage = []
+            assumed = True
+
+        current = (current + [0.0, 0.0, 0.0])[:3]
+        voltage = (voltage + [NOMINAL_VOLTAGE] * 3)[:3]
+        return current, voltage, assumed
+
+    @staticmethod
+    def _cumulative_energy(latest_packets: dict[str, Any]) -> float | None:
+        """Derive lifetime imported energy from the cumulative charge counters.
+
+        Clamp sensors have no energy register. The "qmax" values are cumulative
+        milliampere-seconds per phase, so energy is estimated at nominal
+        voltage. Direction is not measured, so this is consumption only.
+        """
+        for packet_type in ("PhaseRealTime", "PhaseMinute", "PhaseHour", "PhaseDay"):
+            data = latest_packets.get(packet_type, {}).get("data", {})
+            qmax = data.get("qmax")
+            if not qmax:
+                continue
+            ampere_hours = sum(qmax[:3]) / MAS_PER_AMPERE_HOUR
+            return round(ampere_hours * NOMINAL_VOLTAGE / 1000.0, 3)
+        return None
+
     async def get_current_power(self, item_id: int) -> dict[str, Any]:
         """Get current power reading from latest packets."""
         packets = await self.get_latest_packets()
@@ -212,14 +252,11 @@ class PerificAPI:
                         phase_data = latest_packets[packet_type]
                         data = phase_data.get("data", {})
 
-                        # Calculate total power from current and voltage
-                        hiavg = data.get("hiavg", [0, 0, 0])
-                        huavg = data.get("huavg", [230, 230, 230])
+                        current, voltage, voltage_assumed = self._phase_readings(data)
 
                         # Calculate power per phase (P = U * I)
                         power_phases = [
-                            abs(current) * voltage
-                            for current, voltage in zip(hiavg, huavg)
+                            abs(amps) * volts for amps, volts in zip(current, voltage)
                         ]
                         total_power = sum(power_phases)
 
@@ -234,14 +271,15 @@ class PerificAPI:
                                 "l3": power_phases[2],
                             },
                             "voltage": {
-                                "l1": huavg[0],
-                                "l2": huavg[1],
-                                "l3": huavg[2],
+                                "l1": voltage[0],
+                                "l2": voltage[1],
+                                "l3": voltage[2],
                             },
+                            "voltage_assumed": voltage_assumed,
                             "current": {
-                                "l1": hiavg[0],
-                                "l2": hiavg[1],
-                                "l3": hiavg[2],
+                                "l1": current[0],
+                                "l2": current[1],
+                                "l3": current[2],
                             },
                             "imported_energy": data.get("hwi", 0),
                             "exported_energy": data.get("hwo", 0),
@@ -252,30 +290,39 @@ class PerificAPI:
         return {}
 
     async def get_energy_today(self, item_id: int) -> dict[str, Any]:
-        """Get today's energy consumption."""
+        """Get energy totals for a meter."""
         packets = await self.get_latest_packets()
 
         for packet in packets:
-            if packet.get("ItemId") == item_id:
-                latest_packets = packet.get("LatestPackets", {})
+            if packet.get("ItemId") != item_id:
+                continue
 
-                # Get day data if available
-                if "PhaseDay" in latest_packets:
-                    day_data = latest_packets["PhaseDay"].get("data", {})
+            latest_packets = packet.get("LatestPackets", {})
+            day_data = latest_packets.get("PhaseDay", {}).get("data", {})
 
-                    # Calculate energy from power data
-                    hwpi = day_data.get("hwpi", [0, 0, 0])
-                    hwpo = day_data.get("hwpo", [0, 0, 0])
+            if "hwpi" in day_data or "hwpo" in day_data:
+                imported_today = sum(day_data.get("hwpi", [0, 0, 0]))
+                exported_today = sum(day_data.get("hwpo", [0, 0, 0]))
 
-                    imported_today = sum(hwpi)
-                    exported_today = sum(hwpo)
+                return {
+                    "imported": imported_today,
+                    "exported": exported_today,
+                    "net": imported_today - exported_today,
+                    "unit": "kWh",
+                }
 
-                    return {
-                        "imported": imported_today,
-                        "exported": exported_today,
-                        "net": imported_today - exported_today,
-                        "unit": "kWh",
-                    }
+            # Clamp sensors have no energy register. Fall back to the
+            # cumulative charge counters. They only measure magnitude, so
+            # export and net stay unknown rather than being reported as zero.
+            cumulative = self._cumulative_energy(latest_packets)
+            if cumulative is not None:
+                return {
+                    "imported": cumulative,
+                    "exported": None,
+                    "net": None,
+                    "unit": "kWh",
+                    "source": "charge_counters",
+                }
 
         return {"imported": 0, "exported": 0, "net": 0, "unit": "kWh"}
 

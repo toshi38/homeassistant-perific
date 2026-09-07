@@ -175,3 +175,25 @@ For issues and feature requests, please create an issue in the GitHub repository
 ## License
 
 This integration is provided under the MIT License.
+
+## Packet versions
+
+Two packet formats occur in the wild and both are handled.
+
+| | Packet version 3 | Packet version 2 |
+|---|---|---|
+| Example firmware | 4.5.7 | 4.2.3 |
+| Current field | `hiavg` | `iavg` |
+| Voltage field | `huavg`, measured | none, nominal 230 V assumed |
+| Energy field | `hwi` / `hwo` / `hwpi` / `hwpo` | none, derived from the `qmax` charge counters |
+
+Packet version 2 devices reporting `ItemSubType: CurrentSensor` are clamp
+sensors. They measure current only, so:
+
+- Voltage sensors report the assumed nominal 230 V, and the power reading
+  carries a `voltage_assumed` flag.
+- Imported energy is derived from the cumulative charge counters, which are
+  milliampere-seconds per phase, converted at nominal voltage. It is a lifetime
+  total, not a daily figure.
+- Exported and net energy are unavailable rather than zero, because a clamp
+  sensor does not measure direction.

@@ -15,6 +15,15 @@ API_PHASE_DATA = "/getphasedata"
 API_ITEM_PARAMETERS = "/getitemuserparameters"
 API_REPORTER_SETTINGS = "/getreporterssettingsforuser"
 
+# Nominal grid voltage, assumed when the meter reports current only.
+# Packet version 2 devices with ItemSubType "CurrentSensor" are clamp sensors:
+# they carry no voltage register at all, so power has to be estimated as I * U.
+NOMINAL_VOLTAGE = 230.0
+
+# The "q" registers are cumulative charge counters in milliampere-seconds per
+# phase. Divide by this to get ampere-hours.
+MAS_PER_AMPERE_HOUR = 1000.0 * 3600.0
+
 # Update intervals
 SCAN_INTERVAL_POWER = timedelta(seconds=30)
 SCAN_INTERVAL_ENERGY = timedelta(minutes=5)
