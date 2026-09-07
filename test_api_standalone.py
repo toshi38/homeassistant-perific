@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Standalone test script for Perific API."""
+
 import asyncio
 import os
 from typing import Any
