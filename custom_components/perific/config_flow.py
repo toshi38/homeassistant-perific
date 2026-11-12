@@ -67,7 +67,9 @@ class PerificConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="reauth_confirm",
                 data_schema=self._async_step_schema(reauth_entry),
             )
-        return await self._async_step_account(user_input, reauth_entry)
+        return await self._async_step_account(
+            user_input, reauth_entry, step_id="reauth_confirm"
+        )
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
@@ -79,17 +81,20 @@ class PerificConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="reconfigure",
                 data_schema=self._async_step_schema(reconfigure_entry),
             )
-        return await self._async_step_account(user_input, reconfigure_entry)
+        return await self._async_step_account(
+            user_input, reconfigure_entry, step_id="reconfigure"
+        )
 
     async def _async_step_account(
         self,
         user_input: dict[str, Any] | None,
         existing_entry: ConfigEntry | None = None,
+        step_id: str = "user",
     ) -> FlowResult:
         """Validate account data; create, reauth or reconfigure accordingly."""
         if user_input is None:
             return self.async_show_form(
-                step_id="user",
+                step_id=step_id,
                 data_schema=self._async_step_schema(existing_entry),
             )
 
@@ -106,7 +111,7 @@ class PerificConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not await api.check_activation():
                 errors["base"] = "invalid_auth"
                 return self.async_show_form(
-                    step_id=self.step_id,
+                    step_id=step_id,
                     data_schema=self._async_step_schema(existing_entry),
                     errors=errors,
                 )
@@ -128,7 +133,7 @@ class PerificConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if errors:
             return self.async_show_form(
-                step_id=self.step_id,
+                step_id=step_id,
                 data_schema=self._async_step_schema(existing_entry),
                 errors=errors,
             )
