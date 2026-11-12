@@ -62,6 +62,9 @@ class PerificAPI:
         self._token_expires: datetime | None = None
         self._user_id: int | None = None
         self._items: list[dict[str, Any]] = []
+        # Optional hook: called with the new token after every refresh so the
+        # caller can persist it (config entry data).
+        self.on_token_refreshed: Any = None
 
     async def check_activation(self) -> bool:
         """Check if user is activated."""
@@ -111,6 +114,9 @@ class PerificAPI:
                 # Store user ID
                 user_info = result.get("User", {})
                 self._user_id = user_info.get("UserId")
+
+                if self.on_token_refreshed and self._token:
+                    self.on_token_refreshed(self._token)
 
         except ClientError as err:
             raise PerificAuthError(f"Token refresh failed: {err}") from err

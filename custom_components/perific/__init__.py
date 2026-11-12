@@ -8,11 +8,11 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import PerificAPI
+from .api import PerificAPI, PerificAuthError
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,6 +28,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         session=aiohttp_client.async_get_clientsession(hass),
     )
 
+    def persist_token(token: str) -> None:
+        """Keep the freshly obtained token in the config entry.
+
+        Without this the entry keeps its original token forever; once that one
+        expires (Enegic tokens are valid ~1 year) every later reload fails and
+        a new app login is required.
+        """
+        if token and entry.data.get("token") != token:
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, "token": token}
+            )
+
+    api.on_token_refreshed = persist_token
+
     try:
         # Check if user is activated and refresh token if needed
         if not await api.check_activation():
@@ -35,10 +49,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if api._token:
             await api.refresh_token()
+    except PerificAuthError as err:
+        # The stored token is dead (expired/revoked) - offer a reauth flow
+        # so the user can enter a fresh one instead of retrying forever.
+        raise ConfigEntryAuthFailed(f"Failed to authenticate: {err}") from err
     except Exception as err:
         raise ConfigEntryNotReady(f"Failed to authenticate: {err}") from err
 
-    coordinator = PerificDataUpdateCoordinator(hass, api)
+    coordinator = PerificDataUpdateCoordinator(hass, entry, api)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
@@ -63,15 +81,28 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class PerificDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Perific data."""
 
-    def __init__(self, hass: HomeAssistant, api: PerificAPI) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, api: PerificAPI
+    ) -> None:
         """Initialize."""
         self.api = api
+        self._entry = entry
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=30),
         )
+        self.api.on_token_refreshed = self._async_token_refreshed
+
+    def _async_token_refreshed(self, token: str) -> None:
+        """Store the freshly obtained token in the config entry."""
+        if token and self._entry.data.get("token") != token:
+            self.hass.config_entries.async_update_entry(
+                self._entry,
+                data={**self._entry.data, "token": token},
+            )
 
     async def _async_update_data(self):
         """Fetch data from API."""
